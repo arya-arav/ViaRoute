@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@viaroute/db';
+import { runsJobs } from '../config';
 
 const QUEUE = 'postbacks';
 
@@ -33,7 +34,8 @@ export class PostbackService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     const connection = { url: process.env.REDIS_URL ?? 'redis://localhost:6379' };
     this.queue = new Queue(QUEUE, { connection });
-    this.worker = new Worker(QUEUE, (job) => this.deliver(job), { connection, concurrency: 10 });
+    if (!runsJobs) return; // API servers only queue; workers deliver
+    this.worker = new Worker(QUEUE, (job) => this.deliver(job), { connection, concurrency: Number(process.env.POSTBACK_CONCURRENCY ?? 20) });
     this.worker.on('error', (e) => this.log.error(e.message));
   }
 

@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { NumberStatus, Prisma, prisma, Role, TenantStatus, TransactionType, type Tenant } from '@viaroute/db';
 import { REDIS } from '../common/redis.module';
-import { config, portalOrigin } from '../config';
+import { config, portalOrigin, runsJobs } from '../config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InsufficientFundsError, WalletService } from './wallet.service';
 
@@ -33,6 +33,7 @@ export class BillingService implements OnApplicationBootstrap, OnModuleDestroy {
 
   onApplicationBootstrap() {
     if (process.env.NODE_ENV === 'test') return; // tests call runRenewals() directly
+    if (!runsJobs) return; // workers run renewals
     this.timer = setInterval(() => this.runRenewals().catch((e) => this.log.error(e.message)), RENEW_EVERY_MS);
     this.timer.unref();
     void this.runRenewals().catch((e) => this.log.error(e.message));

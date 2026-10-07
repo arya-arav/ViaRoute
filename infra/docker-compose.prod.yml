@@ -37,11 +37,37 @@ services:
     env_file: ../.env.production
     environment:
       NODE_ENV: production
+      # Answers browsers and carrier webhooks; background work goes to the worker below.
+      APP_ROLE: api
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       STORAGE_DIR: /app/storage
     volumes:
       - recordings:/app/storage
     depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+
+  # Background work: postbacks, copying recordings to storage, renewals, clean-up.
+  # More throughput: docker compose … up -d --scale worker=3 (or run workers on other machines
+  # with the same DATABASE_URL, REDIS_URL and S3_* settings).
+  worker:
+    image: ${REGISTRY:-ghcr.io/your-org}/viaroute-api:${TAG:-latest}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: ../.env.production
+    environment:
+      NODE_ENV: production
+      APP_ROLE: worker
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      STORAGE_DIR: /app/storage
+    volumes:
+      - recordings:/app/storage
+    depends_on:
+      api:
+        condition: service_started
       redis:
         condition: service_healthy
         required: false

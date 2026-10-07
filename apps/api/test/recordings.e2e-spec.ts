@@ -1,6 +1,8 @@
 import { privateKey } from './telnyx-keys';
 import type { INestApplication } from '@nestjs/common';
 import { sign } from 'crypto';
+import { createServer } from 'http';
+import type { AddressInfo } from 'net';
 import request from 'supertest';
 import { prisma } from '@viaroute/db';
 import { StorageService } from '../src/common/storage.service';
@@ -174,5 +176,34 @@ describe('Recording notice', () => {
     expect(telnyx.map((c) => c.path)).toEqual(['/calls/n-in-2/actions/answer', '/calls']); // straight to the buyer
     await event('call.answered', { call_control_id: 'rec-out' }).expect(200);
     expect(telnyx.map((c) => c.path).slice(-2)).toEqual(['/calls/n-in-2/actions/bridge', '/calls/n-in-2/actions/record_start']);
+  });
+});
+
+describe('Copying from the carrier (queued)', () => {
+  it('a worker copies the carrier recording into storage and attaches it to the call', async () => {
+    const audio = Buffer.from('ID3 carrier mp3');
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      res.end(audio);
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      const s = await setup();
+      const c = await recordedCall(s.t, s.number);
+      const key = `recordings/queued/${c.id}.mp3`;
+      const { port } = server.address() as AddressInfo;
+      await app.get(RecordingsService).enqueueDownload({ callId: c.id, key, url: `http://127.0.0.1:${port}/rec.mp3` });
+
+      let call = await prisma.call.findUniqueOrThrow({ where: { id: c.id } });
+      for (let i = 0; i < 50 && call.recordingUrl !== key; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        call = await prisma.call.findUniqueOrThrow({ where: { id: c.id } });
+      }
+      expect(call.recordingUrl).toBe(key);
+      expect(call.recordingSize).toBe(audio.length);
+      expect(await app.get(StorageService).exists(key)).toBe(true);
+    } finally {
+      server.close();
+    }
   });
 });

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateKeyPairSync } from 'crypto';
 import request from 'supertest';
 import { prisma } from '@viaroute/db';
-import { createApp, portal, resetDb, signupTenant, verifyEmail } from './helpers';
+import { createApp, portal, resetDb, signupTenant, verifyEmail, waitFor } from './helpers';
 
 let app: INestApplication;
 let admin: ReturnType<typeof portal>;
@@ -244,10 +244,11 @@ describe.each(Object.keys(CARRIERS) as Kind[])('%s', (kind) => {
     // 5) Recording is ready: downloaded (with the carrier's credentials when it needs them).
     hits.length = 0;
     await hook(`recording?call=${callerId}`, k.recording(callerId)).expect(200);
+    const recorded = await waitFor(() => prisma.call.findUniqueOrThrow({ where: { id: call.id } }), (c) => !!c.recordingUrl);
     const download = hits.find((h) => h.url.startsWith('https://recordings.example.com/'))!;
     expect(download).toBeTruthy();
     if (k.recordingAuth) expect(download.auth).toMatch(k.recordingAuth);
-    expect((await prisma.call.findUniqueOrThrow({ where: { id: call.id } })).recordingUrl).toMatch(new RegExp(`^recordings/${tenant.id}/${call.id}\\.(mp3|wav)$`));
+    expect(recorded.recordingUrl).toMatch(new RegExp(`^recordings/${tenant.id}/${call.id}\\.(mp3|wav)$`));
   });
 });
 

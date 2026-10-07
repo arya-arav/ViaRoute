@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { sign } from 'crypto';
 import request from 'supertest';
 import { prisma } from '@viaroute/db';
-import { createApp, resetDb } from './helpers';
+import { createApp, resetDb, waitFor } from './helpers';
 
 let app: INestApplication;
 const realFetch = global.fetch;
@@ -102,6 +102,8 @@ describe('Telnyx webhooks', () => {
     const call = await prisma.call.findFirstOrThrow({ where: { telnyxCallId: 'in-1' } });
     expect(call).toMatchObject({ status: 'COMPLETED', converted: true, durationSec: 100, connectedSec: 90, callerState: 'TX', hangupCause: 'normal_clearing' });
     expect(Number(call.revenue)).toBe(30);
-    expect(call.recordingUrl).toBe(`recordings/${tenant.id}/${call.id}.mp3`);
+    // Copied by the recordings queue right after the webhook.
+    const recorded = await waitFor(() => prisma.call.findUniqueOrThrow({ where: { id: call.id } }), (c) => !!c.recordingUrl);
+    expect(recorded.recordingUrl).toBe(`recordings/${tenant.id}/${call.id}.mp3`);
   });
 });

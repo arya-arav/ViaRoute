@@ -82,3 +82,14 @@ export async function verifyEmail(app: INestApplication, t: { sub: string; email
   const token = await tokenFromEmail(t.email, '/verify-email');
   await portal(app, t.sub).post('/auth/verify-email', { token }).expect(200);
 }
+
+/** Polls until `ok(value)` (background jobs such as the recording copy finish shortly after a webhook). */
+export async function waitFor<T>(get: () => Promise<T>, ok: (v: T) => boolean, ms = 5000): Promise<T> {
+  const until = Date.now() + ms;
+  let v = await get();
+  while (!ok(v) && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 50));
+    v = await get();
+  }
+  return v;
+}

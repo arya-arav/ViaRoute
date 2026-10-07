@@ -5,7 +5,7 @@ import { WalletService } from '../billing/wallet.service';
 import { REDIS } from '../common/redis.module';
 import { ProvidersService } from '../telephony/providers.service';
 import { DEFAULT_PER_MINUTE } from '../config';
-import { StorageService } from '../common/storage.service';
+import { RecordingsService } from './recordings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { stateForNumber } from './area-codes';
 import { AgentsService } from './agents.service';
@@ -129,7 +129,7 @@ export class CallEngine {
     private wallet: WalletService,
     private postbacks: PostbackService,
     private notifications: NotificationsService,
-    private storage: StorageService,
+    private recordings: RecordingsService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -493,8 +493,9 @@ export class CallEngine {
     if (!call) return;
     const ext = ev.contentType.includes('wav') ? 'wav' : 'mp3';
     const key = `recordings/${call.tenantId}/${callId}.${ext}`;
-    const saved = ev.audio ? await this.storage.put(key, ev.audio) : ev.url ? await this.storage.putFromUrl(key, ev.url, ev.headers) : null;
-    if (saved) await prisma.call.update({ where: { id: callId }, data: { recordingUrl: saved, recordingSize: await this.storage.size(saved), recordingDeletedAt: null } });
+    // Audio we already hold is stored now; a carrier link is copied by a worker so this webhook returns fast.
+    if (ev.audio) await this.recordings.saveAudio(callId, key, ev.audio);
+    else if (ev.url) await this.recordings.enqueueDownload({ callId, key, url: ev.url, headers: ev.headers });
   }
 
   // ---------------------------------------------------------------------------

@@ -80,6 +80,22 @@ export const config = {
   unknownHostIsMainSite: process.env.UNKNOWN_HOST_IS_MAIN_SITE === 'true',
 };
 
+/**
+ * What this process does (APP_ROLE):
+ * - all     one process does everything (default: single server, development, tests)
+ * - api     answers browsers and carrier webhooks; background work only goes onto the queues
+ * - worker  no web traffic; runs the queues (postbacks, recordings) and timers (renewals, clean-up)
+ * Run any number of each against the same database and Redis.
+ */
+export type AppRole = 'all' | 'api' | 'worker';
+export const appRole: AppRole = (() => {
+  const r = (process.env.APP_ROLE ?? 'all').trim().toLowerCase();
+  if (r !== 'all' && r !== 'api' && r !== 'worker') throw new Error(`APP_ROLE must be all, api or worker (got "${r}")`);
+  return r;
+})();
+/** This process works the background queues and timers. */
+export const runsJobs = appRole !== 'api';
+
 /** Subdomains customers can never claim. */
 export const RESERVED_SUBDOMAINS = new Set([
   'www', 'app', 'api', 'admin', 'staging', 'status', 'mail', 'docs', 'help', 'support', 'billing', 'static', 'cdn',

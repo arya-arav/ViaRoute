@@ -160,6 +160,22 @@ Repository → Settings:
 
 Every push to `main`: tests → Docker images (GHCR) → staging → your approval → production.
 
+## 5a. API and worker (APP_ROLE)
+
+The same image runs in one of three roles:
+
+| `APP_ROLE` | Does | Use |
+|---|---|---|
+| `all` (default) | everything in one process | xCloud / trial / development |
+| `api` | browsers and carrier webhooks; only *queues* background work | behind the load balancer, scale for call volume |
+| `worker` | postbacks, copying recordings to storage, renewals, recording clean-up; no web traffic (only `/health`) | scale for background volume |
+
+`infra/docker-compose.prod.yml` runs one `api` and one `worker`. More workers on the same server:
+`docker compose -f infra/docker-compose.prod.yml --env-file .env.production up -d --scale worker=3`.
+Workers on other machines need the same `DATABASE_URL`, `REDIS_URL`, secrets and `S3_*` (a bucket is required
+once workers and API servers are on different machines). Tuning: `POSTBACK_CONCURRENCY` (default 20),
+`RECORDING_CONCURRENCY` (default 10) per worker.
+
 ## 6. Monitoring & backups
 
 - [ ] **Uptime**: Better Stack / UptimeRobot on `https://api.viaroute.com/health` (1 min, SMS/Telegram alert)
