@@ -10,40 +10,46 @@ const ns = (name: string) => ({
 });
 const env = {
   API: ns('API'), WEB: ns('WEB'), JOBS: ns('JOBS'), API_INSTANCES: '3', WEB_INSTANCES: '2',
-  APP_DOMAIN: 'viaroute.psoni.in', PORTAL_DOMAIN: 'psoni.in', DATABASE_URL: 'postgres://db', JWT_SECRET: 's', S3_BUCKET: '',
+  APP_DOMAIN: 'viaroute.co', DATABASE_URL: 'postgres://db', JWT_SECRET: 's', S3_BUCKET: '',
   CLOUDFLARE_API_TOKEN: 'must-not-leak',
 } as unknown as Env;
 
 async function run() {
   // /api/* goes to the API without the /api prefix; visitor IP replaces any client-sent value.
   const body = JSON.stringify({ email: 'a@b.c' });
-  await worker.fetch(new Request('https://acme.psoni.in/api/auth/login?x=1', {
-    method: 'POST', body, headers: { 'CF-Connecting-IP': '203.0.113.9', 'X-Forwarded-For': '6.6.6.6', 'X-Tenant-Host': 'acme.psoni.in' },
+  await worker.fetch(new Request('https://acme.viaroute.co/api/auth/login?x=1', {
+    method: 'POST', body, headers: { 'CF-Connecting-IP': '203.0.113.9', 'X-Forwarded-For': '6.6.6.6', 'X-Tenant-Host': 'acme.viaroute.co' },
   }), env);
   let h = hits.pop()!;
   assert.equal(h.ns, 'API');
   assert.match(h.name, /^instance-[0-2]$/);
   const u = new URL(h.req.url);
-  assert.equal(u.host, 'acme.psoni.in');
+  assert.equal(u.host, 'acme.viaroute.co');
   assert.equal(u.pathname + u.search, '/auth/login?x=1');
   assert.equal(h.req.method, 'POST');
   assert.equal(await h.req.text(), body);
   assert.equal(h.req.headers.get('X-Forwarded-For'), '203.0.113.9');
   assert.equal(h.req.headers.get('X-Forwarded-Proto'), 'https');
-  assert.equal(h.req.headers.get('X-Tenant-Host'), 'acme.psoni.in');
+  assert.equal(h.req.headers.get('X-Tenant-Host'), 'acme.viaroute.co');
 
   // Bare /api → API "/".
-  await worker.fetch(new Request('https://viaroute.psoni.in/api'), env);
+  await worker.fetch(new Request('https://viaroute.co/api'), env);
   assert.equal(new URL(hits.pop()!.req.url).pathname, '/');
 
   // Pages (and look-alikes such as /apiary) go to the web app unchanged.
   for (const path of ['/login', '/apiary', '/']) {
-    await worker.fetch(new Request(`https://viaroute.psoni.in${path}`), env);
+    await worker.fetch(new Request(`https://viaroute.co${path}`), env);
     h = hits.pop()!;
     assert.equal(h.ns, 'WEB', path);
     assert.match(h.name, /^instance-[01]$/);
     assert.equal(new URL(h.req.url).pathname, path);
   }
+
+  // www → the main site, same path, nothing reaches the containers.
+  const www = await worker.fetch(new Request('https://www.viaroute.co/signup?ref=x'), env);
+  assert.equal(www.status, 301);
+  assert.equal(www.headers.get('Location'), 'https://viaroute.co/signup?ref=x');
+  assert.equal(hits.length, 0);
 
   // Cron: background worker + every API and web instance.
   const waits: Promise<unknown>[] = [];
@@ -60,7 +66,7 @@ async function run() {
   assert.equal(api.envVars.APP_ROLE, 'api');
   assert.equal(api.envVars.TRUST_PROXY_HOPS, '1');
   assert.equal(api.envVars.DATABASE_URL, 'postgres://db');
-  assert.equal(api.envVars.APP_DOMAIN, 'viaroute.psoni.in');
+  assert.equal(api.envVars.APP_DOMAIN, 'viaroute.co');
   assert.equal('S3_BUCKET' in api.envVars, false);
   assert.equal('CLOUDFLARE_API_TOKEN' in api.envVars, false);
   assert.equal(new Jobs({} as never, env).envVars.APP_ROLE, 'worker');

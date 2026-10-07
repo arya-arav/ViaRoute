@@ -1,7 +1,7 @@
 # ViaRoute on Cloudflare Containers
 
 ```
-browser / carrier ─► Worker "viaroute"  (viaroute.psoni.in + *.psoni.in)
+browser / carrier ─► Worker "viaroute"  (viaroute.co + *.viaroute.co; www → viaroute.co)
                        ├─ /api/*  ─► Api   ×2  standard-1 (½ vCPU, 4 GiB)   APP_ROLE=api
                        └─ pages   ─► Web   ×2  basic      (¼ vCPU, 1 GiB)   Next.js
 cron (every minute) ─► Jobs  ×1  basic   APP_ROLE=worker (postbacks, recordings, renewals, clean-up)
@@ -17,33 +17,31 @@ so recordings must go to R2 and every secret must be set (nothing is generated o
 
 | Item | Notes |
 |---|---|
-| Cloudflare **Workers Paid** plan | $5/month; Containers need it |
-| Domain on Cloudflare | `psoni.in` (zone in the same account) |
+| Cloudflare **Workers Paid** plan on that account | $5/month; Containers need it |
+| **Separate Cloudflare account** with `viaroute.co` | Add the domain there (Websites → Add a domain) and switch its nameservers at the registrar to the two Cloudflare gives you |
 | Managed **Postgres 17** | US East, e.g. Neon, DigitalOcean, or PlanetScale Postgres (billed via Cloudflare) |
 | Managed **Redis** | US East, fixed-price plan (BullMQ polls constantly; avoid pay-per-command). TLS URL `rediss://…` |
 | **R2** bucket | `viaroute-recordings` + an R2 API token (Object Read & Write) |
 | **SMTP** | e.g. Resend — sign-up, invite and password emails (there is no test inbox here) |
 | Docker running locally | `wrangler deploy` builds the images (on Windows: Docker Desktop) |
 
-## DNS (Cloudflare → psoni.in → DNS)
+## DNS (Cloudflare → viaroute.co → DNS)
 
 | Type | Name | Content | Proxy |
 |---|---|---|---|
 | A | `*` | `192.0.2.1` | 🟠 Proxied |
 
-`viaroute.psoni.in` is created automatically (custom domain). The `*` record only has to exist and be proxied;
-the Worker answers, the address is never used. Delete any old records for `viaroute`, `acme` or `*` first.
-
-> **Other sites on psoni.in:** the route `*.psoni.in/*` catches every proxied subdomain. Subdomains with their own
-> DNS record keep resolving, but proxied ones are answered by this Worker — add a more specific route for them, or
-> host ViaRoute on a domain of its own.
+`viaroute.co` itself is created automatically (custom domain). The `*` record only has to exist and be proxied;
+the Worker answers, the address is never used. Universal SSL covers `viaroute.co` and `*.viaroute.co`.
+SSL/TLS mode: **Full**.
 
 ## First deploy
 
 ```bash
 pnpm install
 cd deploy/cloudflare
-npx wrangler login
+npx wrangler login                    # log in with the account that holds viaroute.co
+# If that login can see several accounts, put its Account ID in wrangler.jsonc ("account_id").
 
 # Secrets (each command asks for the value)
 npx wrangler secret put DATABASE_URL          # postgresql://user:pass@host:5432/viaroute?sslmode=require
@@ -64,8 +62,9 @@ pnpm run deploy    # builds api + web images, pushes them, deploys the Worker
 
 The first deploy takes several minutes before containers answer. Then:
 
-- `https://viaroute.psoni.in/api/health` → `{"ok":true,…}`
-- `https://viaroute.psoni.in/login` → admin login (ADMIN_EMAIL / ADMIN_PASSWORD)
+- `https://viaroute.co/api/health` → `{"ok":true,…}`
+- `https://viaroute.co/login` → admin login (ADMIN_EMAIL / ADMIN_PASSWORD)
+- `https://<customer>.viaroute.co` → each customer's portal
 - `npx wrangler tail` → live logs; Cloudflare dashboard → Workers & Pages → viaroute → Containers
 
 Database migrations run automatically when the API starts.

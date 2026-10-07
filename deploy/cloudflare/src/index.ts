@@ -1,7 +1,7 @@
 /**
  * ViaRoute on Cloudflare Containers.
  *
- *   browser / carrier ──► this Worker (viaroute.psoni.in, *.psoni.in)
+ *   browser / carrier ──► this Worker (viaroute.co, *.viaroute.co; www → viaroute.co)
  *                           ├─ /api/*  ──► Api pool   (APP_ROLE=api,    NestJS on :4000, "/api" removed)
  *                           └─ else    ──► Web pool   (Next.js on :3000)
  *   cron (every minute) ──► Jobs       (APP_ROLE=worker: postbacks, recordings, renewals, clean-up)
@@ -102,6 +102,11 @@ function forward(request: Request, path?: string): Request {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // One address for the main site: www.viaroute.co → viaroute.co.
+    if (url.hostname.startsWith('www.')) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
     // Same layout as the one-port Docker gateway: /api/auth/login → API /auth/login.
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       const path = url.pathname.slice(4) || '/';

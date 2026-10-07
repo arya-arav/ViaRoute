@@ -3,26 +3,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "viaroute",
+  // The Cloudflare account that holds viaroute.co (dashboard → Workers & Pages → right sidebar → Account ID).
+  // "account_id": "…",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // Admin/main site on its own hostname; every customer portal on <name>.psoni.in.
-  // NOTE: "*.psoni.in/*" catches every proxied psoni.in subdomain — give other sites on this zone
-  // their own, more specific route (or put ViaRoute on a domain of its own).
+  // Main site + admin on viaroute.co (www redirects there); every customer portal on <name>.viaroute.co.
   "routes": [
-    { "pattern": "viaroute.psoni.in", "custom_domain": true },
-    { "pattern": "*.psoni.in/*", "zone_name": "psoni.in" }
+    { "pattern": "viaroute.co", "custom_domain": true },
+    { "pattern": "*.viaroute.co/*", "zone_name": "viaroute.co" }
   ],
 
   // Every minute: start the background worker if needed and keep the API/web instances warm.
   "triggers": { "crons": ["* * * * *"] },
 
   "vars": {
-    "APP_DOMAIN": "viaroute.psoni.in",
-    "PORTAL_DOMAIN": "psoni.in",
-    "MAIL_FROM": "ViaRoute <no-reply@psoni.in>",
+    "APP_DOMAIN": "viaroute.co",
+    "MAIL_FROM": "ViaRoute <no-reply@viaroute.co>",
     "SIMULATOR_ENABLED": "true",
     "TRIAL_DAYS": "14",
     // Fixed pool sizes (Containers have no autoscaling yet). Raise together with max_instances below.
@@ -57,7 +56,7 @@
       "class_name": "Web",
       "image": "../../apps/web/Dockerfile",
       "image_build_context": "../..",
-      "image_vars": { "NEXT_PUBLIC_API_URL": "/api", "NEXT_PUBLIC_ROOT_DOMAIN": "psoni.in" },
+      "image_vars": { "NEXT_PUBLIC_API_URL": "/api", "NEXT_PUBLIC_ROOT_DOMAIN": "viaroute.co" },
       "instance_type": "basic",
       "max_instances": 4,
       "constraints": { "regions": ["ENAM"] }

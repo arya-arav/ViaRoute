@@ -17,7 +17,7 @@ export class TenantMiddleware implements NestMiddleware {
     req.tenant = null;
 
     const root = config.rootDomain;
-    if (!host || host === config.mainHost || host === root || host === `app.${root}` || host === `api.${root}`) {
+    if (!host || host === config.mainHost || host === root || host === `www.${root}` || host === `app.${root}` || host === `api.${root}`) {
       return next();
     }
 
