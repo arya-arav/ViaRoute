@@ -32,7 +32,7 @@ so recordings must go to R2 and every secret must be set (nothing is generated o
 | A | `*` | `192.0.2.1` | 🟠 Proxied |
 
 `viaroute.psoni.in` is created automatically (custom domain). The `*` record only has to exist and be proxied;
-the Worker answers, the address is never used. Remove old records pointing `viaroute`/`acme`/`*` at the xCloud server.
+the Worker answers, the address is never used. Delete any old records for `viaroute`, `acme` or `*` first.
 
 > **Other sites on psoni.in:** the route `*.psoni.in/*` catches every proxied subdomain. Subdomains with their own
 > DNS record keep resolving, but proxied ones are answered by this Worker — add a more specific route for them, or
@@ -69,11 +69,6 @@ The first deploy takes several minutes before containers answer. Then:
 - `npx wrangler tail` → live logs; Cloudflare dashboard → Workers & Pages → viaroute → Containers
 
 Database migrations run automatically when the API starts.
-
-> **Moving from the old server?** Copy the data first:
-> `pg_dump --no-owner --format=custom OLD_DATABASE_URL > viaroute.dump` then
-> `pg_restore --no-owner --dbname NEW_DATABASE_URL viaroute.dump`. Use the old `JWT_SECRET` and
-> `ENCRYPTION_KEY` (in the old server's secrets volume) or saved carrier passwords can't be decrypted.
 
 ## Updating
 
