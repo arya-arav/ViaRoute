@@ -53,6 +53,18 @@ jobs:
       - run: pnpm --filter @viaroute/web lint
       - run: pnpm --filter @viaroute/web build
 
+  cloudflare:
+    name: Cloudflare Worker checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @viaroute/cloudflare typecheck
+      - run: pnpm --filter @viaroute/cloudflare test
+
   images:
     name: Build & push images
     needs: [test, web]

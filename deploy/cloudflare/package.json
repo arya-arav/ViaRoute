@@ -1,0 +1,22 @@
+{
+  "name": "@viaroute/cloudflare",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ViaRoute on Cloudflare Containers: a Worker in front of the API, web and background-worker containers",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dry-run": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail",
+    "test": "esbuild test/worker.test.ts --bundle --platform=node --format=esm --alias:@cloudflare/containers=./test/containers-stub.ts --outfile=.wrangler/test/worker.test.mjs --log-level=warning && node .wrangler/test/worker.test.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261007.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.148.0"
+  }
+}

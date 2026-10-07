@@ -26,6 +26,11 @@ flowchart LR
 
 ---
 
+## Cloudflare Containers (current target)
+
+Everything runs on Cloudflare: a Worker in front, API / web / background-worker containers behind it, recordings in R2,
+with managed Postgres and Redis. Step-by-step: [deploy/cloudflare/README.md](deploy/cloudflare/README.md).
+
 ## 0a. xCloud / Coolify ("Deploy via Git", one port)
 
 The root `docker-compose.yml` runs everything behind one port (**8080**): web app, API at `/api`, test inbox at `/mail`.

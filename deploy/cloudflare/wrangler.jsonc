@@ -1,0 +1,75 @@
+// ViaRoute on Cloudflare Containers — see deploy/cloudflare/README.md.
+// Deploy (Docker must be running; images are built from this repo): cd deploy/cloudflare && pnpm run deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "viaroute",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Admin/main site on its own hostname; every customer portal on <name>.psoni.in.
+  // NOTE: "*.psoni.in/*" catches every proxied psoni.in subdomain — give other sites on this zone
+  // their own, more specific route (or put ViaRoute on a domain of its own).
+  "routes": [
+    { "pattern": "viaroute.psoni.in", "custom_domain": true },
+    { "pattern": "*.psoni.in/*", "zone_name": "psoni.in" }
+  ],
+
+  // Every minute: start the background worker if needed and keep the API/web instances warm.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "vars": {
+    "APP_DOMAIN": "viaroute.psoni.in",
+    "PORTAL_DOMAIN": "psoni.in",
+    "MAIL_FROM": "ViaRoute <no-reply@psoni.in>",
+    "SIMULATOR_ENABLED": "true",
+    "TRIAL_DAYS": "14",
+    // Fixed pool sizes (Containers have no autoscaling yet). Raise together with max_instances below.
+    "API_INSTANCES": "2",
+    "WEB_INSTANCES": "2"
+  },
+  // Secrets (wrangler secret put …): DATABASE_URL, REDIS_URL, JWT_SECRET, ENCRYPTION_KEY, ADMIN_EMAIL,
+  // ADMIN_PASSWORD, SMTP_URL, S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
+  // and when ready TELNYX_API_KEY, TELNYX_PUBLIC_KEY, TELNYX_CONNECTION_ID, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET.
+
+  "containers": [
+    {
+      // API: ½ vCPU, 4 GiB. Near the database (US East).
+      "class_name": "Api",
+      "image": "../../apps/api/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-1",
+      "max_instances": 4,
+      "constraints": { "regions": ["ENAM"] }
+    },
+    {
+      // Background worker: same image as the API, started with APP_ROLE=worker.
+      "class_name": "Jobs",
+      "image": "../../apps/api/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "basic",
+      "max_instances": 2,
+      "constraints": { "regions": ["ENAM"] }
+    },
+    {
+      // Web app: ¼ vCPU, 1 GiB. Browser calls the API on the same address (/api).
+      "class_name": "Web",
+      "image": "../../apps/web/Dockerfile",
+      "image_build_context": "../..",
+      "image_vars": { "NEXT_PUBLIC_API_URL": "/api", "NEXT_PUBLIC_ROOT_DOMAIN": "psoni.in" },
+      "instance_type": "basic",
+      "max_instances": 4,
+      "constraints": { "regions": ["ENAM"] }
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "API", "class_name": "Api" },
+      { "name": "JOBS", "class_name": "Jobs" },
+      { "name": "WEB", "class_name": "Web" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Api", "Jobs", "Web"] }]
+}
